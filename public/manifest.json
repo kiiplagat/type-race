@@ -1,0 +1,13 @@
+{
+  "name": "Turbo Type",
+  "short_name": "Turbo Type",
+  "description": "Type to drive. Race the AI or a friend.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1020",
+  "theme_color": "#0d1020",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

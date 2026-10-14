@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Turbo Type</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<meta name="theme-color" content="#0d1020">
+<style>
+:root{--bg:#0d1020;--card:#171b33;--line:#2a3157;--txt:#e9ecff;--mut:#8f97c4;--acc:#ffcc33;--ok:#3ddc97;--bad:#ff5470;--blue:#4da3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#app{max-width:760px;margin:0 auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.screen{display:none;flex-direction:column;gap:14px}
+.screen.on{display:flex}
+h1{font-size:36px;margin:10px 0 0;letter-spacing:1px}
+h1 span{color:var(--acc)}
+p.sub{margin:0;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h3{margin:0;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px;background:var(--acc);color:#1b1500;cursor:pointer}
+button:active{transform:scale(.98)}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;background:transparent;color:var(--txt);border:1px solid var(--line)}
+.seg button.sel{background:var(--blue);border-color:var(--blue);color:#001a33}
+input[type=text]{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0a0d1c;color:var(--txt)}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.hint{font-size:13px;color:var(--mut);margin:0}
+.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.stat b{display:block;font-size:24px}
+.stat small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.stage{position:relative}
+canvas{width:100%;height:170px;display:block;border-radius:14px;background:#12162b}
+#cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:900;color:var(--acc);text-shadow:0 4px 20px #000;pointer-events:none}
+#ribbon{position:relative;height:72px;overflow:hidden;background:#0a0d1c;border:2px solid var(--line);border-radius:14px;font:700 28px/72px ui-monospace,Menlo,Consolas,monospace}
+#ribbon::before{content:"";position:absolute;left:0;top:0;bottom:0;width:44px;background:linear-gradient(90deg,rgba(255,84,112,.5),transparent);z-index:2}
+#track{position:absolute;left:0;top:0;white-space:pre;will-change:transform;color:#c9d0ff}
+#track .ok{color:var(--ok)}
+#track .cur{display:inline-block;width:1ch;background:var(--acc);color:#1b1500;border-radius:4px}
+#track .cur.bad{background:var(--bad);color:#fff}
+#tapmsg{text-align:center;color:var(--mut);font-size:13px}
+.big{font-size:30px;font-weight:900;text-align:center;margin:8px 0}
+.res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#kb{position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="menu" class="screen on">
+    <h1>TURBO <span>TYPE</span></h1>
+    <p class="sub">Type to drive. Faster typing, faster car. Mistype and you lose speed until you hit the right key.</p>
+    <div class="card">
+      <h3>Driver name</h3>
+      <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+    </div>
+    <div class="card">
+      <h3>Difficulty (marquee speed)</h3>
+      <div class="seg" id="diff">
+        <button data-d="easy" class="sel">Easy</button>
+        <button data-d="medium">Medium</button>
+        <button data-d="hard">Hard</button>
+      </div>
+      <p class="hint" id="diffHint"></p>
+    </div>
+    <button id="btnAI">Race the AI</button>
+    <button id="btnPvP" class="ghost">Online PvP</button>
+    <p class="hint" id="best"></p>
+  </section>
+
+  <section id="lobby" class="screen">
+    <h1>Online <span>PvP</span></h1>
+    <div class="card">
+      <h3>Host a race</h3>
+      <button id="btnCreate">Create room</button>
+    </div>
+    <div class="card">
+      <h3>Join a friend</h3>
+      <div class="row">
+        <input type="text" id="code" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off">
+        <button id="btnJoin">Join</button>
+      </div>
+    </div>
+    <details class="card"><summary>Server address</summary><input type="text" id="srv" autocomplete="off"></details>
+    <p id="lobbyStatus" class="big" style="font-size:18px"></p>
+    <button class="ghost" id="lobbyBack">Back</button>
+  </section>
+
+  <section id="game" class="screen">
+    <div class="hud">
+      <div class="stat"><b id="hWpm">0</b><small>WPM</small></div>
+      <div class="stat"><b id="hAcc">100%</b><small>Accuracy</small></div>
+      <div class="stat"><b id="hSpd">0</b><small>km/h</small></div>
+    </div>
+    <div class="stage"><canvas id="cv"></canvas><div id="cd"></div></div>
+    <div id="ribbon"><div id="track"></div></div>
+    <div id="tapmsg">Tap anywhere to bring up the keyboard</div>
+  </section>
+
+  <section id="result" class="screen">
+    <div class="big" id="resTitle"></div>
+    <div class="res">
+      <div class="stat"><b id="rWpm">0</b><small>WPM</small></div>
+      <div class="stat"><b id="rAcc">0%</b><small>Accuracy</small></div>
+      <div class="stat"><b id="rMiss">0</b><small>Missed</small></div>
+    </div>
+    <p class="hint" id="resNote" style="text-align:center"></p>
+    <button id="again">Race again</button>
+    <button class="ghost" id="toMenu">Menu</button>
+  </section>
+</div>
+
+<input id="kb" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" enterkeyhint="done">
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+
+// ---------- config ----------
+// speed: marquee drift in px/s. ai: AI typing speed in chars/s (5 chars = 1 word)
+const DIFF={
+  easy:  {speed:45,  ai:3.1, wmin:3, wmax:5,  label:'Slow marquee, short words. AI types about 37 WPM.'},
+  medium:{speed:80,  ai:5.3, wmin:4, wmax:7,  label:'Faster marquee, medium words. AI types about 64 WPM.'},
+  hard:  {speed:125, ai:8.2, wmin:5, wmax:10, label:'Fast marquee, long words. AI types about 98 WPM.'}
+};
+const WORDS=("car run fly win top jet map sky fun key gas oil lap pit tyre road race fast gear turn lane flag spin drift boost track speed "+
+"pedal brake clutch engine wheel nitro smoke curve sprint finish winner racing circuit machine driver rocket thunder lightning "+
+"highway horizon velocity overtake champion straight corner chicane trophy podium garage mechanic exhaust turbo piston cylinder "+
+"throttle steering traction handling aerodynamic accelerate adventure challenge fearless unstoppable motorway breakthrough "+
+"momentum precision rhythm focus ignite blaze rush dash zoom swift quick rapid sharp bold brave grand prime power force").split(' ');
+
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+const cfg={mode:'ai',diff:'easy',name:store('tt_name')||''};
+let ws=null,myId=null,oppName='Rival',g=null,cw=16,dpr=1;
+
+// ---------- helpers ----------
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function passage(seed,d){
+  const r=mulberry(seed),pool=WORDS.filter(w=>w.length>=d.wmin&&w.length<=d.wmax),out=[];let n=0;
+  while(n<700){const w=pool[Math.floor(r()*pool.length)];out.push(w);n+=w.length+1}
+  return out.join(' ');
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  if(id==='game')resize();
+}
+function resize(){dpr=window.devicePixelRatio||1;const r=$('#cv').getBoundingClientRect();$('#cv').width=r.width*dpr;$('#cv').height=r.height*dpr}
+addEventListener('resize',()=>{if($('#game').classList.contains('on'))resize()});
+
+// ---------- menu ----------
+$('#name').value=cfg.name;
+function updHint(){$('#diffHint').textContent=DIFF[cfg.diff].label;const b=store('tt_best_'+cfg.diff);$('#best').textContent=b?`Best on ${cfg.diff}: ${b} WPM`:''}
+document.querySelectorAll('#diff button').forEach(b=>b.onclick=()=>{
+  cfg.diff=b.dataset.d;document.querySelectorAll('#diff button').forEach(x=>x.classList.toggle('sel',x===b));updHint();
+});
+function readName(){cfg.name=($('#name').value.trim()||'Driver').slice(0,16);store('tt_name',cfg.name)}
+$('#btnAI').onclick=()=>{readName();cfg.mode='ai';startRace(Math.random()*2**31|0)};
+$('#btnPvP').onclick=()=>{readName();cfg.mode='pvp';$('#lobbyStatus').textContent='';show('lobby')};
+$('#lobbyBack').onclick=()=>{if(ws)ws.close();show('menu')};
+updHint();
+
+// ---------- networking ----------
+const defURL=location.protocol.startsWith('http')?((location.protocol==='https:'?'wss://':'ws://')+location.host):'ws://localhost:8080';
+$('#srv').value=defURL;
+const lstat=t=>$('#lobbyStatus').textContent=t;
+function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))}
+function connect(onopen){
+  if(ws&&ws.readyState===1){onopen();return}
+  lstat('Connecting…');
+  try{ws=new WebSocket($('#srv').value.trim()||defURL)}catch(e){lstat('Bad server address');return}
+  ws.onopen=onopen;
+  ws.onmessage=e=>{try{wsMsg(JSON.parse(e.data))}catch(_){}};
+  ws.onerror=()=>lstat('Could not reach the server');
+  ws.onclose=()=>{if(g&&g.opp&&!g.over)endRace(false,'Connection lost')};
+}
+$('#btnCreate').onclick=()=>connect(()=>send({t:'create',name:cfg.name,diff:cfg.diff}));
+$('#btnJoin').onclick=()=>{
+  const c=$('#code').value.trim().toUpperCase();
+  if(c.length!==4){lstat('Enter the 4-letter room code');return}
+  connect(()=>send({t:'join',code:c,name:cfg.name}));
+};
+function wsMsg(m){
+  switch(m.t){
+    case 'created':myId=m.id;lstat('Room code: '+m.code+'. Waiting for your opponent…');break;
+    case 'joined':myId=m.id;lstat('Joined. Get ready…');break;
+    case 'err':lstat(m.msg);break;
+    case 'start':{
+      cfg.diff=m.diff;cfg.mode='pvp';
+      const o=m.players.find(p=>p.id!==myId);oppName=o?o.name:'Rival';
+      startRace(m.seed);break;
+    }
+    case 'p':if(g&&g.opp){g.opp.pos=m.pos;g.opp.v=m.v;g.opp.wpm=m.wpm}break;
+    case 'end':if(g&&!g.over)endRace(m.winner===myId);break;
+    case 'left':if(g&&!g.over)endRace(true,'Your opponent left the race');else lstat('Opponent left');break;
+  }
+}
+
+// ---------- race ----------
+function startRace(seed){
+  const D=DIFF[cfg.diff];
+  g={text:passage(seed,D),idx:0,s:0,p:0,err:false,v:0,pos:0,keys:[],correct:0,wrong:0,missed:0,
+     state:'count',t0:0,t:0,off:[0,0],sentAt:0,over:false,sentFin:false,dirty:true,startX:0,
+     ai:cfg.mode==='ai'?{pos:0,v:0,nextS:4+Math.random()*5,stumble:0}:null,
+     opp:cfg.mode==='pvp'?{pos:0,shown:0,v:0,wpm:0,name:oppName}:null};
+  show('game');
+  // measure monospace char width
+  const m=document.createElement('span');m.textContent='M'.repeat(20);m.style.cssText='position:absolute;visibility:hidden;white-space:pre';
+  $('#ribbon').appendChild(m);cw=m.getBoundingClientRect().width/20;m.remove();
+  renderRibbon();
+  $('#kb').focus();
+  const me=g;let n=3;$('#cd').textContent=n;
+  const tick=()=>{
+    if(g!==me)return;n--;
+    if(n>0){$('#cd').textContent=n;setTimeout(tick,800)}
+    else{$('#cd').textContent='GO!';me.state='race';me.t0=performance.now();setTimeout(()=>{if(g===me)$('#cd').textContent=''},600)}
+  };
+  setTimeout(tick,800);
+}
+
+function renderRibbon(){
+  g.s=Math.max(0,g.idx-30);
+  const t=g.text,c=t[g.idx]||' ';
+  $('#track').innerHTML=`<span class="ok">${t.slice(g.s,g.idx)}</span><span class="cur${g.err?' bad':''}">${c}</span><span>${t.slice(g.idx+1,g.idx+90)}</span>`;
+  g.dirty=false;
+}
+
+function onChar(ch){
+  if(!g||g.state!=='race'||g.over)return;
+  if(ch.toLowerCase()===g.text[g.idx]){
+    g.err=false;g.idx++;g.correct++;g.keys.push(performance.now());
+    g.p=Math.max(g.p-cw,-cw*3);
+  }else{
+    g.err=true;g.wrong++;
+  }
+  g.dirty=true;
+}
+const kb=$('#kb');
+kb.addEventListener('input',()=>{const v=kb.value;kb.value='';for(const ch of v)onChar(ch)});
+$('#game').addEventListener('pointerdown',()=>kb.focus());
+
+function update(dt,now){
+  g.t+=dt;
+  if(g.opp)g.opp.shown+=(g.opp.pos-g.opp.shown)*(1-Math.exp(-10*dt));
+  if(g.state!=='race'){ if(g.state==='done')g.v*=Math.exp(-1.5*dt); return; }
+  const D=DIFF[cfg.diff];
+
+  // marquee pressure: the current word drifts left; if it leaves the screen it is missed
+  g.p+=D.speed*dt;
+  g.startX=$('#ribbon').clientWidth*0.35;
+  if(g.p>g.startX+cw){g.idx++;g.p-=cw;g.missed++;g.v*=.55;g.dirty=true}
+
+  // player speed follows recent typing rate; an error bleeds speed until the right key
+  while(g.keys.length&&now-g.keys[0]>2000)g.keys.shift();
+  const target=(g.keys.length/2)*0.55;
+  if(g.err)g.v*=Math.exp(-2.2*dt);
+  else g.v+=(target-g.v)*(1-Math.exp(-4*dt));
+  g.pos=Math.min(100,g.pos+g.v*dt);
+
+  if(g.ai){
+    const a=g.ai;a.nextS-=dt;
+    if(a.nextS<=0){a.stumble=.7+Math.random()*.6;a.nextS=6+Math.random()*9}
+    if(a.stumble>0){a.stumble-=dt;a.v*=Math.exp(-2.2*dt)}
+    else{const c=D.ai*(1+.12*Math.sin(g.t*.9)+(Math.random()-.5)*.06);a.v+=(c*.55-a.v)*(1-Math.exp(-4*dt))}
+    a.pos=Math.min(100,a.pos+a.v*dt);
+    if(g.pos>=100||a.pos>=100)endRace(g.pos>=a.pos);
+  }else{
+    if(now-g.sentAt>100){g.sentAt=now;send({t:'p',pos:g.pos,v:g.v,wpm:liveWpm()})}
+    if(g.pos>=100&&!g.sentFin){g.sentFin=true;send({t:'fin'})}
+  }
+}
+const liveWpm=()=>Math.round(g.keys.length/2*12);
+
+function endRace(win,note){
+  if(!g||g.over)return;
+  g.over=true;g.state='done';g.win=win;g.note=note||'';
+  setTimeout(showResult,900);
+}
+function showResult(){
+  const el=Math.max(1,(performance.now()-g.t0)/1000);
+  const wpm=Math.round(g.correct/5/(el/60));
+  const tot=g.correct+g.wrong,acc=tot?Math.round(g.correct/tot*100):100;
+  $('#resTitle').textContent=g.win?'🏆 You win!':(g.ai?'The AI wins this one':'Your rival wins');
+  $('#rWpm').textContent=wpm;$('#rAcc').textContent=acc+'%';$('#rMiss').textContent=g.missed;
+  let note=g.note;
+  if(g.opp&&!note)note=`${g.opp.name} was typing around ${g.opp.wpm} WPM`;
+  const best=+store('tt_best_'+cfg.diff)||0;
+  if(wpm>best&&g.correct>20){store('tt_best_'+cfg.diff,wpm);note=(note?note+'. ':'')+'New personal best!'}
+  $('#resNote').textContent=note;
+  $('#again').textContent='Race again';$('#again').disabled=false;
+  updHint();show('result');
+}
+$('#again').onclick=()=>{
+  if(cfg.mode==='ai')startRace(Math.random()*2**31|0);
+  else{send({t:'rematch'});$('#again').textContent='Waiting for opponent…';$('#again').disabled=true}
+};
+$('#toMenu').onclick=()=>{if(ws){ws.close();ws=null}g=null;show('menu')};
+
+// ---------- drawing ----------
+function rr(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill()}
+function drawCar(ctx,x,y,h,color,v,t,hurt){
+  const w=h*2;ctx.save();ctx.translate(x,y);
+  if(v>1){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;
+    for(let i=0;i<3;i++){const ly=h*.35+i*h*.2,len=Math.min(70,v*16)*(.6+.4*Math.sin(t*20+i));
+      ctx.beginPath();ctx.moveTo(-4,ly);ctx.lineTo(-4-len,ly);ctx.stroke()}}
+  ctx.fillStyle=(hurt&&Math.floor(t*12)%2)?'#ff5470':color;
+  rr(ctx,0,h*.3,w,h*.55,8);
+  rr(ctx,w*.28,0,w*.42,h*.45,8);
+  ctx.fillStyle='rgba(200,232,255,.85)';rr(ctx,w*.33,h*.07,w*.32,h*.28,5);
+  ctx.fillStyle='#ffe9a0';rr(ctx,w-6,h*.42,6,h*.14,2);
+  [w*.22,w*.78].forEach(wx=>{
+    ctx.fillStyle='#0b0b12';ctx.beginPath();ctx.arc(wx,h*.88,h*.21,0,7);ctx.fill();
+    ctx.strokeStyle='#8a90b0';ctx.lineWidth=2;const a=t*v*5;
+    ctx.beginPath();ctx.moveTo(wx+Math.cos(a)*h*.15,h*.88+Math.sin(a)*h*.15);ctx.lineTo(wx-Math.cos(a)*h*.15,h*.88-Math.sin(a)*h*.15);ctx.stroke();
+  });
+  ctx.restore();
+}
+function draw(dt){
+  const cv=$('#cv'),ctx=cv.getContext('2d'),W=cv.width/dpr,H=cv.height/dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const laneH=H/2,ch=34,cwid=ch*2;
+  const lanes=[
+    {pos:g.pos,v:g.v,color:'#ff5470',name:cfg.name||'You',hurt:g.err},
+    {pos:g.ai?g.ai.pos:g.opp.shown,v:g.ai?g.ai.v:g.opp.v,color:'#4da3ff',name:g.ai?'AI · '+cfg.diff:g.opp.name,hurt:false}
+  ];
+  lanes.forEach((L,i)=>{
+    const top=i*laneH;
+    ctx.fillStyle=i?'#1d2240':'#222849';ctx.fillRect(0,top,W,laneH);
+    g.off[i]=(g.off[i]+L.v*dt*60)%44;
+    ctx.fillStyle='rgba(255,255,255,.25)';
+    for(let x=-g.off[i];x<W;x+=44)ctx.fillRect(x,top+laneH-4,22,3);
+    ctx.fillStyle='#8f97c4';ctx.font='12px system-ui';ctx.fillText(L.name,8,top+14);
+    const cx=8+L.pos/100*(W-8-cwid-52);
+    drawCar(ctx,cx,top+(laneH-ch)/2+3,ch,L.color,L.v,g.t,L.hurt);
+  });
+  // finish line
+  for(let r=0;r<H/10;r++)for(let c=0;c<2;c++){ctx.fillStyle=(r+c)%2?'#fff':'#111';ctx.fillRect(W-40+c*10,r*10,10,10)}
+}
+function hud(){
+  $('#hWpm').textContent=g.state==='race'?liveWpm():0;
+  const tot=g.correct+g.wrong;$('#hAcc').textContent=(tot?Math.round(g.correct/tot*100):100)+'%';
+  $('#hSpd').textContent=Math.round(g.v*40);
+  $('#tapmsg').style.display=document.activeElement===kb?'none':'block';
+}
+
+// ---------- main loop ----------
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(!g||!$('#game').classList.contains('on'))return;
+  update(dt,now);
+  if(g.dirty)renderRibbon();
+  $('#track').style.transform=`translateX(${g.startX-g.p-(g.idx-g.s)*cw}px)`;
+  draw(dt);hud();
+}
+requestAnimationFrame(frame);
+
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
