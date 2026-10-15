@@ -6,9 +6,9 @@
 <title>TypeRace</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
-<meta name="theme-color" content="#0d1020">
+<meta name="theme-color" content="#f2f5fc">
 <style>
-:root{--bg:#0d1020;--card:#171b33;--line:#2a3157;--txt:#e9ecff;--mut:#8f97c4;--acc:#ffcc33;--ok:#3ddc97;--bad:#ff5470;--blue:#4da3ff}
+:root{--bg:#f2f5fc;--card:#ffffff;--line:#d3dbef;--txt:#141a33;--mut:#5a6591;--acc:#2f6df6;--accInk:#ffffff;--ok:#12a66a;--bad:#e5334f;--blue:#2f6df6;--field:#f7f9ff;--word:#2a3358}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 #app{max-width:760px;margin:0 auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -19,13 +19,13 @@ h1 span{color:var(--acc)}
 p.sub{margin:0;color:var(--mut)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .card h3{margin:0;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
-button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px;background:var(--acc);color:#1b1500;cursor:pointer}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px;background:var(--acc);color:var(--accInk);cursor:pointer}
 button:active{transform:scale(.98)}
 button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
 .seg{display:flex;gap:8px}
 .seg button{flex:1;background:transparent;color:var(--txt);border:1px solid var(--line)}
-.seg button.sel{background:var(--blue);border-color:var(--blue);color:#001a33}
-input[type=text]{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0a0d1c;color:var(--txt)}
+.seg button.sel{background:var(--blue);border-color:var(--blue);color:var(--accInk)}
+input[type=text]{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--txt)}
 .row{display:flex;gap:8px}
 .row>*{flex:1}
 .hint{font-size:13px;color:var(--mut);margin:0}
@@ -34,15 +34,15 @@ input[type=text]{font:inherit;width:100%;padding:12px;border-radius:12px;border:
 .stat b{display:block;font-size:24px}
 .stat small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .stage{position:relative}
-#ready{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;padding:12px 18px;max-width:90%;box-shadow:0 6px 24px #000a}
+#ready{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;padding:12px 18px;max-width:90%;box-shadow:0 6px 24px rgba(30,50,120,.25)}
 #ready[hidden]{display:none}
-canvas{width:100%;height:170px;display:block;border-radius:14px;background:#12162b}
-#cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:900;color:var(--acc);text-shadow:0 4px 20px #000;pointer-events:none}
-#ribbon{position:relative;height:72px;overflow:hidden;background:#0a0d1c;border:2px solid var(--line);border-radius:14px;font:700 28px/72px ui-monospace,Menlo,Consolas,monospace}
-#ribbon::before{content:"";position:absolute;left:0;top:0;bottom:0;width:44px;background:linear-gradient(90deg,rgba(255,84,112,.5),transparent);z-index:2}
-#track{position:absolute;left:0;top:0;white-space:pre;will-change:transform;color:#c9d0ff}
+canvas{width:100%;height:170px;display:block;border-radius:14px;background:#dfe5f6}
+#cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:900;color:var(--acc);text-shadow:0 2px 14px rgba(255,255,255,.95);pointer-events:none}
+#ribbon{position:relative;height:72px;overflow:hidden;background:var(--card);border:2px solid var(--line);border-radius:14px;font:700 28px/72px ui-monospace,Menlo,Consolas,monospace}
+#ribbon::before{content:"";position:absolute;left:0;top:0;bottom:0;width:44px;background:linear-gradient(90deg,rgba(229,51,79,.35),transparent);z-index:2}
+#track{position:absolute;left:0;top:0;white-space:pre;will-change:transform;color:var(--word)}
 #track .ok{color:var(--ok)}
-#track .cur{display:inline-block;width:1ch;background:var(--acc);color:#1b1500;border-radius:4px}
+#track .cur{display:inline-block;width:1ch;background:var(--acc);color:var(--accInk);border-radius:4px}
 #track .cur.bad{background:var(--bad);color:#fff}
 #tapmsg{text-align:center;color:var(--mut);font-size:13px}
 .big{font-size:30px;font-weight:900;text-align:center;margin:8px 0}
@@ -360,7 +360,7 @@ $('#toMenu').onclick=()=>{if(ws){ws.close();ws=null}g=null;show('menu')};
 function rr(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill()}
 function drawCar(ctx,x,y,h,color,v,t,hurt){
   const w=h*2;ctx.save();ctx.translate(x,y);
-  if(v>1){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;
+  if(v>1){ctx.strokeStyle='rgba(20,26,51,.3)';ctx.lineWidth=2;
     for(let i=0;i<3;i++){const ly=h*.35+i*h*.2,len=Math.min(70,v*16)*(.6+.4*Math.sin(t*20+i));
       ctx.beginPath();ctx.moveTo(-4,ly);ctx.lineTo(-4-len,ly);ctx.stroke()}}
   ctx.fillStyle=(hurt&&Math.floor(t*12)%2)?'#ff5470':color;
@@ -381,15 +381,15 @@ function draw(dt){
   const laneH=H/2,ch=34,cwid=ch*2;
   const lanes=[
     {pos:g.pos,v:g.v,color:'#ff5470',name:cfg.name||'You',hurt:g.err},
-    {pos:g.ai?g.ai.pos:g.opp.shown,v:g.ai?g.ai.v:g.opp.v,color:'#4da3ff',name:g.ai?'AI · '+cfg.diff:g.opp.name,hurt:false}
+    {pos:g.ai?g.ai.pos:g.opp.shown,v:g.ai?g.ai.v:g.opp.v,color:'#2f8cff',name:g.ai?'AI · '+cfg.diff:g.opp.name,hurt:false}
   ];
   lanes.forEach((L,i)=>{
     const top=i*laneH;
-    ctx.fillStyle=i?'#1d2240':'#222849';ctx.fillRect(0,top,W,laneH);
+    ctx.fillStyle=i?'#d3dbf0':'#dfe5f6';ctx.fillRect(0,top,W,laneH);
     g.off[i]=(g.off[i]+L.v*dt*60)%44;
-    ctx.fillStyle='rgba(255,255,255,.25)';
+    ctx.fillStyle='rgba(255,255,255,.95)';
     for(let x=-g.off[i];x<W;x+=44)ctx.fillRect(x,top+laneH-4,22,3);
-    ctx.fillStyle='#8f97c4';ctx.font='12px system-ui';if(laneH>=60)ctx.fillText(L.name,8,top+14);
+    ctx.fillStyle='#5a6591';ctx.font='12px system-ui';if(laneH>=60)ctx.fillText(L.name,8,top+14);
     const cx=8+L.pos/100*(W-8-cwid-52);
     drawCar(ctx,cx,top+(laneH-ch)/2+3,ch,L.color,L.v,g.t,L.hurt);
   });
