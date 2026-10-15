@@ -4,7 +4,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
     fetch(e.request)
-      .then(r => { const c = r.clone(); caches.open('turbo-type-1').then(x => x.put(e.request, c)); return r; })
+      .then(r => { const c = r.clone(); caches.open('typerace-2').then(x => x.put(e.request, c)); return r; })
       .catch(() => caches.match(e.request))
   );
 });

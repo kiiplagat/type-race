@@ -42,6 +42,7 @@ function newCode() {
 function startRoom(room) {
   room.winner = null;
   room.rematch.clear();
+  room.ready.clear();
   const seed = Math.random() * 2 ** 31 | 0;
   const players = room.players.map(p => ({ id: p.id, name: p.name }));
   room.players.forEach(p => send(p, { t: 'start', seed, diff: room.diff, players }));
@@ -61,7 +62,7 @@ wss.on('connection', ws => {
       const code = newCode();
       ws.name = String(m.name || 'Player').slice(0, 16);
       const room = {
-        code, players: [ws], winner: null, rematch: new Set(),
+        code, players: [ws], winner: null, rematch: new Set(), ready: new Set(),
         diff: DIFFS.includes(m.diff) ? m.diff : 'easy'
       };
       ws.room = room;
@@ -90,6 +91,12 @@ wss.on('connection', ws => {
         ws.room.winner = ws.id;
         ws.room.players.forEach(p => send(p, { t: 'end', winner: ws.id }));
       }
+    } else if (m.t === 'ready') {
+      ws.room.ready.add(ws.id);
+      if (ws.room.players.length === 2 && ws.room.ready.size === 2) {
+        ws.room.ready.clear();
+        ws.room.players.forEach(p => send(p, { t: 'go' }));
+      }
     } else if (m.t === 'rematch') {
       ws.room.rematch.add(ws.id);
       if (ws.room.players.length === 2 && ws.room.rematch.size === 2) startRoom(ws.room);
@@ -115,4 +122,4 @@ setInterval(() => {
 }, 30000);
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log('Turbo Type running on http://localhost:' + PORT));
+server.listen(PORT, () => console.log('TypeRace running on http://localhost:' + PORT));

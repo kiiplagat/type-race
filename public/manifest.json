@@ -1,6 +1,6 @@
 {
-  "name": "Turbo Type",
-  "short_name": "Turbo Type",
+  "name": "TypeRace",
+  "short_name": "TypeRace",
   "description": "Type to drive. Race the AI or a friend.",
   "start_url": "./",
   "display": "standalone",

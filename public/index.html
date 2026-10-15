@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
-<title>Turbo Type</title>
+<title>TypeRace</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
 <meta name="theme-color" content="#0d1020">
@@ -34,6 +34,8 @@ input[type=text]{font:inherit;width:100%;padding:12px;border-radius:12px;border:
 .stat b{display:block;font-size:24px}
 .stat small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .stage{position:relative}
+#ready{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;padding:12px 18px;max-width:90%;box-shadow:0 6px 24px #000a}
+#ready[hidden]{display:none}
 canvas{width:100%;height:170px;display:block;border-radius:14px;background:#12162b}
 #cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:900;color:var(--acc);text-shadow:0 4px 20px #000;pointer-events:none}
 #ribbon{position:relative;height:72px;overflow:hidden;background:#0a0d1c;border:2px solid var(--line);border-radius:14px;font:700 28px/72px ui-monospace,Menlo,Consolas,monospace}
@@ -62,7 +64,7 @@ html.playing #cd{font-size:56px}
 <div id="app">
 
   <section id="menu" class="screen on">
-    <h1>TURBO <span>TYPE</span></h1>
+    <h1>TYPE<span>RACE</span></h1>
     <p class="sub">Type to drive. Faster typing, faster car. Mistype and you lose speed until you hit the right key.</p>
     <div class="card">
       <h3>Driver name</h3>
@@ -106,7 +108,7 @@ html.playing #cd{font-size:56px}
       <div class="stat"><b id="hAcc">100%</b><small>Accuracy</small></div>
       <div class="stat"><b id="hSpd">0</b><small>km/h</small></div>
     </div>
-    <div class="stage"><canvas id="cv"></canvas><div id="cd"></div></div>
+    <div class="stage"><canvas id="cv"></canvas><div id="cd"></div><button id="ready" hidden>Tap to start</button></div>
     <div id="ribbon"><div id="track"></div></div>
     <div id="tapmsg">Tap anywhere to bring up the keyboard</div>
   </section>
@@ -158,7 +160,11 @@ function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
   document.documentElement.classList.toggle('playing',id==='game');
   window.scrollTo(0,0);
-  if(id==='game'){fitViewport();resize()}
+  if(id==='game'){
+    // drop focus from lobby inputs so a stale keyboard can't fight the game layout
+    const a=document.activeElement;if(a&&a.id!=='kb'&&a.blur)a.blur();
+    fitViewport(true);resize();
+  }
 }
 // Track the visible area (shrinks when the keyboard opens) and pin the app to it
 // Phone browsers fire viewport events late and out of order, so this also runs every frame while racing.
@@ -221,8 +227,9 @@ function wsMsg(m){
     case 'start':{
       cfg.diff=m.diff;cfg.mode='pvp';
       const o=m.players.find(p=>p.id!==myId);oppName=o?o.name:'Rival';
-      startRace(m.seed);break;
+      startRace(m.seed,true);break;
     }
+    case 'go':if(g&&g.state==='wait'){$('#ready').hidden=true;beginCountdown()}break;
     case 'p':if(g&&g.opp){g.opp.pos=m.pos;g.opp.v=m.v;g.opp.wpm=m.wpm}break;
     case 'end':if(g&&!g.over)endRace(m.winner===myId);break;
     case 'left':if(g&&!g.over)endRace(true,'Your opponent left the race');else lstat('Opponent left');break;
@@ -230,10 +237,12 @@ function wsMsg(m){
 }
 
 // ---------- race ----------
-function startRace(seed){
+// wait=true (PvP): the race starts from a network message, not a tap, so browsers won't open the
+// keyboard by themselves. Each player taps "Tap to start" first; the server sends 'go' once both have.
+function startRace(seed,wait){
   const D=DIFF[cfg.diff];
   g={text:passage(seed,D),idx:0,s:0,p:0,err:false,v:0,pos:0,keys:[],correct:0,wrong:0,missed:0,
-     state:'count',t0:0,t:0,off:[0,0],sentAt:0,over:false,sentFin:false,dirty:true,startX:0,
+     state:wait?'wait':'count',t0:0,t:0,off:[0,0],sentAt:0,over:false,sentFin:false,dirty:true,startX:0,
      ai:cfg.mode==='ai'?{pos:0,v:0,nextS:4+Math.random()*5,stumble:0}:null,
      opp:cfg.mode==='pvp'?{pos:0,shown:0,v:0,wpm:0,name:oppName}:null};
   show('game');
@@ -241,8 +250,18 @@ function startRace(seed){
   const m=document.createElement('span');m.textContent='M'.repeat(20);m.style.cssText='position:absolute;visibility:hidden;white-space:pre';
   $('#ribbon').appendChild(m);cw=m.getBoundingClientRect().width/20;m.remove();
   renderRibbon();
+  const rb=$('#ready');
+  if(wait){
+    $('#cd').textContent='';
+    rb.hidden=false;rb.disabled=false;rb.textContent=`${oppName} is here. Tap to start`;
+    return;
+  }
+  rb.hidden=true;
   $('#kb').focus({preventScroll:true});
-  const me=g;let n=3;$('#cd').textContent=n;
+  beginCountdown();
+}
+function beginCountdown(){
+  const me=g;me.state='count';let n=3;$('#cd').textContent=n;
   const tick=()=>{
     if(g!==me)return;n--;
     if(n>0){$('#cd').textContent=n;setTimeout(tick,800)}
@@ -270,7 +289,14 @@ function onChar(ch){
 }
 const kb=$('#kb');
 kb.addEventListener('input',()=>{const v=kb.value;kb.value='';for(const ch of v)onChar(ch)});
-$('#game').addEventListener('pointerdown',()=>kb.focus({preventScroll:true}));
+// iOS only opens the keyboard from click/touchend, not pointerdown, so listen for all three
+['pointerdown','touchend','click'].forEach(ev=>$('#game').addEventListener(ev,()=>{if(g&&!g.over)kb.focus({preventScroll:true})}));
+$('#ready').addEventListener('click',()=>{
+  if(!g||g.state!=='wait')return;
+  kb.focus({preventScroll:true});
+  const rb=$('#ready');rb.disabled=true;rb.textContent='Waiting for opponent…';
+  send({t:'ready'});
+});
 kb.addEventListener('focus',()=>{window.scrollTo(0,0);setTimeout(fitViewport,50);setTimeout(fitViewport,300)});
 
 function update(dt,now){

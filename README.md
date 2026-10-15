@@ -1,4 +1,4 @@
-# Turbo Type
+# TypeRace
 
 Typing race game: type to drive. Faster typing = faster car. A wrong key bleeds speed until you type the right one.
 

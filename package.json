@@ -1,5 +1,5 @@
 {
-  "name": "turbo-type",
+  "name": "typerace",
   "version": "1.0.0",
   "description": "Typing race game: type to drive. AI and online PvP.",
   "main": "server.js",
