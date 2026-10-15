@@ -135,10 +135,74 @@ const $=s=>document.querySelector(s);
 // ---------- config ----------
 // speed: marquee drift in px/s. ai: AI typing speed in chars/s (5 chars = 1 word)
 const DIFF={
-  easy:  {speed:45,  ai:3.1, wmin:3, wmax:5,  label:'Slow marquee, short words. AI types about 37 WPM.'},
+  easy:  {speed:45,  ai:3.1, wmin:3, wmax:5,  sent:true, label:'Slow marquee, full readable sentences. AI types about 37 WPM.'},
   medium:{speed:80,  ai:5.3, wmin:4, wmax:7,  label:'Faster marquee, medium words. AI types about 64 WPM.'},
   hard:  {speed:125, ai:8.2, wmin:5, wmax:10, label:'Fast marquee, long words. AI types about 98 WPM.'}
 };
+const SENTENCES=[
+  "The red car drives fast down the long road.",
+  "I like to race my friends on sunny days.",
+  "A good driver keeps both hands on the wheel.",
+  "The race starts when the green light comes on.",
+  "My car is quick, but your car is quicker.",
+  "We went to the track early in the morning.",
+  "The finish line is just a little further ahead.",
+  "She turned the corner without slowing down.",
+  "Fast fingers make a fast car.",
+  "The engine hums as the cars line up.",
+  "He wins the race by a tiny margin.",
+  "Rain made the road shiny and slippery.",
+  "Every driver wants to be first across the line.",
+  "The crowd cheers when the cars go past.",
+  "Keep calm, stay focused, and keep typing.",
+  "A small mistake can cost you the whole race.",
+  "The blue car follows close behind the red one.",
+  "They fixed the tyre in just a few seconds.",
+  "The sun is bright and the sky is clear.",
+  "Practice every day and you will get faster.",
+  "The old road runs along the quiet river.",
+  "We drove all night to reach the big city.",
+  "The mechanic checked the engine before the race.",
+  "Slow down at the corner and speed up after it.",
+  "My brother taught me how to drive a car.",
+  "The wind blew hard across the open field.",
+  "Good typists look at the words, not at the keys.",
+  "The trophy shines on the shelf in the hall.",
+  "There is a small shop at the end of the street.",
+  "He parked the car under a tall green tree.",
+  "The race was close until the very last lap.",
+  "Please wait here while I find the keys.",
+  "The little car climbed the hill with ease.",
+  "A clean start gives you a big advantage.",
+  "The driver smiled and waved to the crowd.",
+  "Mountains stood tall behind the winding road.",
+  "Never give up, even when you fall behind.",
+  "The team cheered as their car crossed the line.",
+  "It takes patience to become a great racer.",
+  "The morning air was cool and fresh.",
+  "She packed a bag and set off on a long trip.",
+  "The traffic light turned from red to green.",
+  "Our school has a big field near the gate.",
+  "The bus arrives at eight every morning.",
+  "I wrote a letter to my friend in another town.",
+  "Fresh bread smells wonderful in the morning.",
+  "The children played football until it got dark.",
+  "A kind word can brighten a hard day.",
+  "The farmer drove his truck to the market.",
+  "We shared a meal and talked about the race.",
+  "The path through the forest was calm and green.",
+  "He kept his eyes on the road and his mind on the goal.",
+  "The boat sailed slowly across the blue lake.",
+  "Learning to type well takes time and effort.",
+  "The moon rose over the hills as the cars rolled home.",
+  "Bright lights lit up the track at night.",
+  "Take a deep breath and start again.",
+  "The winner thanked everyone who helped along the way.",
+  "Our car needs fuel before the next race.",
+  "The river flows past the village and out to sea.",
+  "A steady pace often beats a wild rush.",
+  "Look ahead, think fast, and type with care."
+];
 const WORDS=("car run fly win top jet map sky fun key gas oil lap pit tyre road race fast gear turn lane flag spin drift boost track speed "+
 "pedal brake clutch engine wheel nitro smoke curve sprint finish winner racing circuit machine driver rocket thunder lightning "+
 "highway horizon velocity overtake champion straight corner chicane trophy podium garage mechanic exhaust turbo piston cylinder "+
@@ -152,6 +216,12 @@ let ws=null,myId=null,oppName='Rival',g=null,cw=16,dpr=1;
 // ---------- helpers ----------
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function passage(seed,d){
+  if(d.sent){ // easy: complete sentences, shuffled by the seed so both PvP players get the same text
+    const r=mulberry(seed),a=SENTENCES.slice();
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+    let out='',k=0;while(out.length<700){out+=(out?' ':'')+a[k++%a.length]}
+    return out;
+  }
   const r=mulberry(seed),pool=WORDS.filter(w=>w.length>=d.wmin&&w.length<=d.wmax),out=[];let n=0;
   while(n<700){const w=pool[Math.floor(r()*pool.length)];out.push(w);n+=w.length+1}
   return out.join(' ');
@@ -277,10 +347,15 @@ function renderRibbon(){
   g.dirty=false;
 }
 
+// Periods and commas are skipped automatically (phone keyboards hide them), so players only type letters and spaces.
+const PUNCT='.,?!';
+function skipPunct(){while(g.idx<g.text.length&&PUNCT.includes(g.text[g.idx]))g.idx++}
 function onChar(ch){
   if(!g||g.state!=='race'||g.over)return;
-  if(ch.toLowerCase()===g.text[g.idx]){
+  if(PUNCT.includes(ch)&&g.idx>0&&g.text[g.idx-1]===ch)return; // player typed the punctuation we already skipped
+  if(ch.toLowerCase()===g.text[g.idx].toLowerCase()){
     g.err=false;g.idx++;g.correct++;g.keys.push(performance.now());
+    skipPunct();
     g.p=Math.max(g.p-cw,-cw*3);
   }else{
     g.err=true;g.wrong++;
@@ -308,7 +383,7 @@ function update(dt,now){
   // marquee pressure: the current word drifts left; if it leaves the screen it is missed
   g.p+=D.speed*dt;
   g.startX=$('#ribbon').clientWidth*0.35;
-  if(g.p>g.startX+cw){g.idx++;g.p-=cw;g.missed++;g.v*=.55;g.dirty=true}
+  if(g.p>g.startX+cw){g.idx++;skipPunct();g.p-=cw;g.missed++;g.v*=.55;g.dirty=true}
 
   // player speed follows recent typing rate; an error bleeds speed until the right key
   while(g.keys.length&&now-g.keys[0]>2000)g.keys.shift();
