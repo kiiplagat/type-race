@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Turbo Type</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
@@ -45,7 +45,17 @@ canvas{width:100%;height:170px;display:block;border-radius:14px;background:#1216
 #tapmsg{text-align:center;color:var(--mut);font-size:13px}
 .big{font-size:30px;font-weight:900;text-align:center;margin:8px 0}
 .res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-#kb{position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0}
+/* full-width input pinned to the top of the visible area: the browser sees it as already visible, so it has no reason to scroll */
+#kb{position:fixed;left:0;top:0;width:100%;height:44px;opacity:.01;border:0;padding:0;margin:0;font-size:16px;background:transparent;color:transparent;caret-color:transparent;pointer-events:none;z-index:-1}
+/* While racing, lock the page to the visible area so the phone keyboard can't scroll it away */
+html.playing,html.playing body{position:fixed;inset:0;width:100%;overflow:hidden;overscroll-behavior:none;touch-action:none}
+html.playing #app{position:fixed;left:0;right:0;top:0;height:var(--vvh,100dvh);overflow:hidden;padding:8px 12px;margin:0 auto}
+html.playing #game{gap:8px;height:100%;justify-content:flex-start}
+html.playing .stat{padding:4px}
+html.playing .stat b{font-size:18px}
+html.playing canvas{height:clamp(96px,calc(var(--vvh,100vh) * .26),170px)}
+html.playing #ribbon{height:60px;font-size:24px;line-height:60px;flex:none}
+html.playing #cd{font-size:56px}
 </style>
 </head>
 <body>
@@ -146,8 +156,28 @@ function passage(seed,d){
 }
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
-  if(id==='game')resize();
+  document.documentElement.classList.toggle('playing',id==='game');
+  window.scrollTo(0,0);
+  if(id==='game'){fitViewport();resize()}
 }
+// Track the visible area (shrinks when the keyboard opens) and pin the app to it
+// Phone browsers fire viewport events late and out of order, so this also runs every frame while racing.
+let vpKey='';
+function fitViewport(force){
+  const vv=window.visualViewport,app=$('#app'),playing=document.documentElement.classList.contains('playing');
+  const h=Math.round(vv?vv.height:window.innerHeight),top=Math.round(vv?vv.offsetTop:0),key=h+'|'+top+'|'+playing;
+  if(playing&&(window.scrollY||window.scrollX))window.scrollTo(0,0);
+  if(key===vpKey&&!force)return;
+  vpKey=key;
+  document.documentElement.style.setProperty('--vvh',h+'px');
+  app.style.transform=playing&&top?`translateY(${top}px)`:'';
+  if(playing)resize();
+}
+// add ?debug to the URL to see what the phone reports about its viewport
+const DBG=/[?&]debug/.test(location.search);let dbg=null;
+if(DBG){dbg=document.createElement('div');dbg.style.cssText='position:fixed;right:4px;top:2px;z-index:99;background:#000c;color:#0f0;font:11px monospace;padding:3px 5px;pointer-events:none';document.body.appendChild(dbg)}
+if(window.visualViewport){visualViewport.addEventListener('resize',fitViewport);visualViewport.addEventListener('scroll',fitViewport)}
+addEventListener('orientationchange',()=>setTimeout(fitViewport,300));
 function resize(){dpr=window.devicePixelRatio||1;const r=$('#cv').getBoundingClientRect();$('#cv').width=r.width*dpr;$('#cv').height=r.height*dpr}
 addEventListener('resize',()=>{if($('#game').classList.contains('on'))resize()});
 
@@ -211,7 +241,7 @@ function startRace(seed){
   const m=document.createElement('span');m.textContent='M'.repeat(20);m.style.cssText='position:absolute;visibility:hidden;white-space:pre';
   $('#ribbon').appendChild(m);cw=m.getBoundingClientRect().width/20;m.remove();
   renderRibbon();
-  $('#kb').focus();
+  $('#kb').focus({preventScroll:true});
   const me=g;let n=3;$('#cd').textContent=n;
   const tick=()=>{
     if(g!==me)return;n--;
@@ -240,7 +270,8 @@ function onChar(ch){
 }
 const kb=$('#kb');
 kb.addEventListener('input',()=>{const v=kb.value;kb.value='';for(const ch of v)onChar(ch)});
-$('#game').addEventListener('pointerdown',()=>kb.focus());
+$('#game').addEventListener('pointerdown',()=>kb.focus({preventScroll:true}));
+kb.addEventListener('focus',()=>{window.scrollTo(0,0);setTimeout(fitViewport,50);setTimeout(fitViewport,300)});
 
 function update(dt,now){
   g.t+=dt;
@@ -332,7 +363,7 @@ function draw(dt){
     g.off[i]=(g.off[i]+L.v*dt*60)%44;
     ctx.fillStyle='rgba(255,255,255,.25)';
     for(let x=-g.off[i];x<W;x+=44)ctx.fillRect(x,top+laneH-4,22,3);
-    ctx.fillStyle='#8f97c4';ctx.font='12px system-ui';ctx.fillText(L.name,8,top+14);
+    ctx.fillStyle='#8f97c4';ctx.font='12px system-ui';if(laneH>=60)ctx.fillText(L.name,8,top+14);
     const cx=8+L.pos/100*(W-8-cwid-52);
     drawCar(ctx,cx,top+(laneH-ch)/2+3,ch,L.color,L.v,g.t,L.hurt);
   });
@@ -351,6 +382,8 @@ let last=performance.now();
 function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(.05,(now-last)/1000);last=now;
+  fitViewport();
+  if(dbg){const vv=window.visualViewport;dbg.textContent=`inner ${innerHeight} vv ${vv?Math.round(vv.height):'-'} top ${vv?Math.round(vv.offsetTop):'-'} scroll ${Math.round(scrollY)}`}
   if(!g||!$('#game').classList.contains('on'))return;
   update(dt,now);
   if(g.dirty)renderRibbon();
